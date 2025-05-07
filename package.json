@@ -42,6 +42,8 @@
 		"vitest": "^3.0.0"
 	},
 	"dependencies": {
+		"@supabase/auth-helpers-shared": "^0.7.0",
+		"@supabase/auth-helpers-sveltekit": "^0.13.0",
 		"@supabase/supabase-js": "^2.49.4",
 		"@tailwindcss/vite": "^4.1.5",
 		"daisyui": "^5.0.35",
