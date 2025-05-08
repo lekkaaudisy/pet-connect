@@ -1,4 +1,3 @@
-<!-- src/routes/+page.svelte -->
 <svelte:head>
     <title>Welcome - PetConnect</title>
     <meta name="description" content="Welcome to PetConnect, a social network for pets and their owners." />

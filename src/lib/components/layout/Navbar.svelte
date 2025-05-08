@@ -1,13 +1,12 @@
-<!-- src/lib/components/layout/Navbar.svelte -->
 <script lang="ts">
     import { themeChange } from 'theme-change';
     import { onMount } from 'svelte';
-    import type { Session } from '@supabase/supabase-js'; // Import Session type
+    import type { Session } from '@supabase/supabase-js'; 
 
-    export let currentSession: Session | null; // Prop to receive the session
+    export let currentSession: Session | null; 
 
     onMount(() => {
-        themeChange(false); // Initialize theme changer specific to this component instance
+        themeChange(false);
     });
 
     function getProfileUrl() {
@@ -18,12 +17,14 @@
         }
         return '/';
     }
+
+    $: homeHref = currentSession ? '/feed' : '/';
 </script>
 
 <header class="bg-neutral text-neutral-content shadow-md sticky top-0 z-50">
     <div class="container mx-auto navbar px-4">
         <div class="flex-1">
-            <a href="/" class="btn btn-ghost normal-case text-xl">PetConnect</a>
+            <a href={homeHref} class="btn btn-ghost normal-case text-xl">PetConnect</a>
         </div>
 
         <div class="flex-none flex items-center space-x-2">
@@ -37,7 +38,7 @@
                     <li><div class="menu-title px-4 py-2"><span>Change Theme</span></div></li>
                     <li><button role="menuitem" data-set-theme="light" data-act-class="active" class="btn btn-ghost btn-sm justify-start w-full">Light</button></li>
                     <li><button role="menuitem" data-set-theme="dark" data-act-class="active" class="btn btn-ghost btn-sm justify-start w-full">Dark</button></li>
-                    <li><button role="menuitem" data-set-theme="cupcake" data-act-class="active" class="btn btn-ghost btn-sm justify-start w-full">Cupcake</button></li>
+                    <li><button role="menuitem" data-set-theme="dim" data-act-class="active" class="btn btn-ghost btn-sm justify-start w-full">Dim</button></li>
                 </ul>
             </div>
 

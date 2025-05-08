@@ -1,4 +1,3 @@
-<!-- src/routes/auth/login/+page.svelte -->
 <script lang="ts">
     import { enhance } from '$app/forms';
     import type { ActionData } from './$types';
@@ -70,15 +69,14 @@
                     {/if}
                 </div>
 
-                <!-- Optional: Remember me, Forgot password -->
+                <!-- Remember me, Forgot password -->
                 <div class="flex items-center justify-between">
-                    <!-- <div class="flex items-center">
+                    <div class="flex items-center">
                         <input id="remember-me" name="remember-me" type="checkbox" class="checkbox checkbox-primary" />
                         <label for="remember-me" class="ml-2 block text-sm"> Remember me </label>
-                    </div> -->
+                    </div>
                     <div class="text-sm">
                         <a href="/auth/forgot-password" class="link link-hover link-secondary"> Forgot your password? </a>
-                        <!-- We'll implement forgot-password later -->
                     </div>
                 </div>
 
