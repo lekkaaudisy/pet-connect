@@ -1,65 +1,68 @@
+/* eslint-disable prefer-const */
 /* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/routes/profile/[identifier]/+page.server.ts
-import { error, fail } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit'; // Removed `fail` as it's not used here
 import type { PageServerLoad } from './$types';
-import isUUID from 'validator/lib/isUUID'; // Helper to check if identifier is a UUID
+import isUUID from 'validator/lib/isUUID';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
     const { identifier } = params;
-    const { supabase } = locals; // Use Supabase client from locals
+    const { supabase, session } = locals; // Destructure session for easier access
 
-    console.log(`[Profile Load] Loading profile for identifier: ${identifier}`);
+    console.log(`[User Profile Load] Loading profile and pets for identifier: ${identifier}`);
 
-    let profileData = null;
-    let queryError = null;
+    let userProfileData: any = null; // Using 'any' for now, can be typed more strictly later
+    let userPetsData: any[] = [];   // Initialize as empty array
+     
+    let queryError: any = null;
 
-    // Determine if the identifier is likely a UUID (user ID) or a username (string)
-    // We'll query based on that assumption.
-    if (isUUID(identifier)) {
-        // Assume it's a user ID (UUID)
-        const { data, error: dbError } = await supabase
-            .from('users')
-            .select('id, username, email, full_name, profile_picture_url, created_at') // Select desired public fields
-            .eq('id', identifier)
-            .maybeSingle(); // Use maybeSingle() in case the ID doesn't exist
+    // Determine if the identifier is a UUID (user ID) or a username
+     
+    let queryField = isUUID(identifier) ? 'id' : 'username';
+    let queryValue = identifier;
 
-        profileData = data;
-        queryError = dbError;
+    // Fetch user profile data
+    const { data: profile, error: profileDbError } = await supabase
+        .from('users')
+        .select('id, username, email, full_name, profile_picture_url, created_at')
+        .eq(queryField, queryValue)
+        .single(); // Use single() as we expect one user or an error
 
+    if (profileDbError) {
+        console.error(`[User Profile Load] Error fetching user profile for ${identifier}:`, profileDbError.message);
+        if (profileDbError.code === 'PGRST116') {
+            throw error(404, 'User profile not found');
+        }
+        throw error(500, `Server error: Unable to retrieve user profile. ${profileDbError.message}`);
+    }
+
+    if (!profile) { // Should be caught by PGRST116, but as a fallback
+        throw error(404, 'User profile not found');
+    }
+    userProfileData = profile;
+
+    // If user profile is found, fetch their pets
+    const { data: pets, error: petsDbError } = await supabase
+        .from('pets')
+        .select('id, name, species, profile_picture_url') // Select only needed fields for the list
+        .eq('user_id', userProfileData.id) // Match pets by the found user's ID
+        .order('created_at', { ascending: false }); // Order by most recently added
+
+    if (petsDbError) {
+        // Log error but don't necessarily fail the whole page load if pets can't be fetched
+        console.error(`[User Profile Load] Error fetching pets for user ${userProfileData.id}:`, petsDbError.message);
     } else {
-        // Assume it's a username (string)
-         const { data, error: dbError } = await supabase
-            .from('users')
-            .select('id, username, email, full_name, profile_picture_url, created_at') // Select desired public fields
-            .eq('username', identifier)
-            .maybeSingle(); // Use maybeSingle() in case the username doesn't exist
-
-        profileData = data;
-        queryError = dbError;
+        userPetsData = pets || []; // Ensure userPetsData is an array
     }
 
+    const isOwnProfile = session?.user?.id === userProfileData.id;
 
-    if (queryError) {
-        // Don't throw critical error, just log it and let page handle potentially null profile
-        console.error(`[Profile Load] Error fetching profile for ${identifier}:`, queryError.message);
-        // You could potentially throw a 500 error here if database errors are critical
-        // throw error(500, `Database error: ${queryError.message}`);
-    }
+    console.log(`[User Profile Load] User Profile: ${userProfileData.username}, Pets found: ${userPetsData.length}, Is own profile: ${isOwnProfile}`);
 
-    if (!profileData) {
-        // If no profile was found by either ID or username
-        console.log(`[Profile Load] Profile not found for identifier: ${identifier}`);
-        throw error(404, 'User profile not found'); // Throw a 404 Not Found error
-    }
-
-    // Determine if the logged-in user is viewing their own profile
-    const isOwnProfile = locals.session?.user?.id === profileData.id;
-
-    console.log(`[Profile Load] Profile data found for ${identifier}. Is own profile: ${isOwnProfile}`);
-
-    // Return the fetched profile data and ownership status
     return {
-        profile: profileData,
+        profile: userProfileData,
+        pets: userPetsData, // Pass the pets array to the page
         isOwnProfile: isOwnProfile
     };
 };
