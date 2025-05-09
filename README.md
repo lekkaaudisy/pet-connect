@@ -1,6 +1,4 @@
----
-
-**Project Description: PetConnect**
+<h1>Project Description: PetConnect</h1>
 
 **Introduction**
 
