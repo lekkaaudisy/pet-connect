@@ -2,21 +2,64 @@
 	import { enhance } from '$app/forms';
 	import type { ActionData, PageData } from './$types';
 	import { goto } from '$app/navigation';
+	import { Trash2 } from 'lucide-svelte';
 
 	export let data: PageData;
 	export let form: ActionData | null = null;
 
-	$: name = form?.data?.name ?? data.pet.name ?? '';
-	$: species = form?.data?.species ?? data.pet.species ?? '';
-	$: breed = form?.data?.breed ?? data.pet.breed ?? '';
-	$: birth_date = form?.data?.birth_date ?? data.pet.birth_date ?? '';
-	$: color = form?.data?.color ?? data.pet.color ?? '';
-	$: distinguishing_features = form?.data?.distinguishing_features ?? data.pet.distinguishing_features ?? '';
-	$: bio = form?.data?.bio ?? data.pet.bio ?? '';
+	// Better typed interface for the form data
+	interface PetFormData {
+		name: string;
+		species: string;
+		breed: string | null;
+		birth_date: string | null;
+		color: string | null;
+		distinguishing_features: string | null;
+		bio: string | null;
+		profile_picture?: File;
+	}
+
+	// Better typed interface for form errors
+	interface FormErrors {
+		name?: string[];
+		species?: string[];
+		breed?: string[];
+		birth_date?: string[];
+		color?: string[];
+		distinguishing_features?: string[];
+		bio?: string[];
+		profile_picture?: string[];
+	}
+
+	// Properly typed interface for form structure
+	interface FormData {
+		success?: boolean;
+		data?: PetFormData;
+		error?: string;
+		message?: string;
+		errors?: FormErrors;
+		updatedPetId?: string;
+	}
+
+	// Assert that form has the right structure
+	function getFormData(): Partial<PetFormData> {
+		return (form?.data as PetFormData) || {};
+	}
+
+	// Safely extract form values with proper fallbacks
+	$: formData = getFormData();
+	$: name = formData.name ?? data.pet.name ?? '';
+	$: species = formData.species ?? data.pet.species ?? '';
+	$: breed = formData.breed ?? data.pet.breed ?? '';
+	$: birth_date = formData.birth_date ?? data.pet.birth_date ?? '';
+	$: color = formData.color ?? data.pet.color ?? '';
+	$: distinguishing_features = formData.distinguishing_features ?? data.pet.distinguishing_features ?? '';
+	$: bio = formData.bio ?? data.pet.bio ?? '';
 
 	let imagePreviewUrl: string | null = data.pet.profile_picture_url ?? null;
 	let fileInput: HTMLInputElement;
     let formElement: HTMLFormElement;
+    let deleteModal: HTMLDialogElement;
 
 	function handleFileChange(event: Event) {
         const target = event.target as HTMLInputElement;
@@ -48,6 +91,37 @@
         fileInput?.click();
     }
 
+    interface DeleteActionResult {
+        type: 'success' | 'failure' | 'error' | 'redirect';
+        data?: {
+            deleted?: boolean;
+            error?: string;
+        };
+        error?: {
+            message?: string;
+        };
+        status?: number;
+        location?: string;
+    }
+
+    async function handleDeleteResult(actionResult: DeleteActionResult) {
+        if (actionResult.type === 'success' && actionResult.data?.deleted) {
+            alert('Pet profile deleted successfully.');
+            if (data && data.pet && data.pet.user_id) {
+                goto(`/profile/${data.pet.user_id}`, { invalidateAll: true });
+            } else {
+                goto('/', { invalidateAll: true });
+            }
+        } else if (actionResult.type === 'failure' && actionResult.data?.error) {
+            alert(`Error deleting pet: ${actionResult.data.error}`);
+        } else if (actionResult.type === 'error') {
+            alert(`Error processing delete request: ${actionResult.error?.message || 'Unknown error'}`);
+        } else if (actionResult.type === 'redirect') {
+            // Handle redirect case
+            goto(actionResult.location || '/', { invalidateAll: true });
+        }
+    }
+
 	$: {
 		if (form?.success && form?.updatedPetId) {
             const targetUrl = `/pets/${form.updatedPetId}`;
@@ -62,7 +136,10 @@
 </svelte:head>
 
 <div class="container mx-auto px-4 py-8 max-w-2xl">
-	<h1 class="text-3xl font-bold mb-8 text-center">Edit {data.pet.name}'s Profile</h1>
+    <div class="flex justify-between items-center mb-8">
+        <h1 class="text-3xl font-bold">Edit {data.pet.name ?? 'Pet'}'s Profile</h1>
+        <a href={`/pets/${data.pet.id}`} class="btn btn-sm btn-outline">View Profile</a>
+    </div>
 
     {#if form && form.error && !form.success}
         <div class="alert alert-error shadow-lg mb-6">
@@ -78,7 +155,7 @@
         </div>
     {/if}
 
-	<form bind:this={formElement} method="POST" use:enhance enctype="multipart/form-data" class="space-y-8">
+	<form bind:this={formElement} method="POST" action="?/update" use:enhance class="space-y-8">
 
         <div class="flex items-center space-x-6 p-4 border border-base-300 rounded-lg bg-base-200">
              <div class="avatar flex-shrink-0">
@@ -182,4 +259,41 @@
             <button type="submit" class="btn btn-primary w-full md:w-auto md:ml-auto">Save Changes</button>
         </div>
 	</form>
+
+    <div class="mt-12 pt-6 border-t border-error/30">
+        <h3 class="text-xl font-semibold text-error mb-3">Danger Zone</h3>
+        <p class="text-sm text-base-content/70 mb-4">
+            Deleting your pet's profile is permanent and cannot be undone.
+            All associated data will be removed.
+        </p>
+        <button type="button" class="btn btn-error btn-outline" on:click={() => deleteModal.showModal()}>
+            <Trash2 class="w-4 h-4 mr-2" />
+            Delete Pet Profile
+        </button>
+    </div>
+
+    <dialog bind:this={deleteModal} id="delete_pet_modal" class="modal">
+        <div class="modal-box">
+            <form method="dialog"> <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2">✕</button> </form>
+            <h3 class="font-bold text-lg text-error">Confirm Deletion</h3>
+            <p class="py-4">Are you absolutely sure you want to delete {data.pet.name}'s profile? This action cannot be undone.</p>
+            <div class="modal-action">
+                <form method="dialog"> <button class="btn">Cancel</button> </form>
+                <form
+                    method="POST"
+                    action={`/pets/${data.pet.id}/edit?/delete`}
+                    use:enhance={({ form, data, action, cancel, submitter }) => {
+                        return async ({ result }) => {
+                            deleteModal.close();
+                            await handleDeleteResult(result as DeleteActionResult);
+                        };
+                    }}
+                >
+                    <button type="submit" class="btn btn-error">Yes, Delete Profile</button>
+                </form>
+            </div>
+        </div>
+         <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+
 </div>
